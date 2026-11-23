@@ -1,0 +1,33 @@
+# Training profile (16k context: prompt + up to 14,000 answer tokens).
+# Qwen3.8-27B on one MI300X (192 GB) with the phased schedule: SGLang is stopped while forward_backward runs and
+# restarted (adapters reloaded from in-memory copies) to sample (zroform.engine.PhaseGate), so each phase gets
+# (almost) the whole GPU. docs/SERVER.md, "One-GPU phased schedule".
+name: mi300x-qwen38-27b-phased
+host: 127.0.0.1
+port: 8100
+sdk_version: "0.33.1"
+api_keys_env: ZROFORM_API_KEYS
+slots_per_base: 1
+models:
+  Qwen/Qwen3.8-27B:
+    max_lora_rank: 64
+    max_model_len: 16384
+store_dir: ${ZROFORM_DATA}/store
+trainer_device: cuda:0
+sampler_gpus: []                 # empty: SGLang on the trainer's GPU
+sampler_phased_memory: restart   # stop SGLang while training, restart it to sample ("release" crashes on HIP)
+# Share of the GPU memory free at SGLang start (~138 GB after the trainer's ~56 GB of weights) that SGLang may use:
+# its own ~56 GB of weights plus KV cache and request state, all freed for the trainer while it trains. It leaves
+# headroom for the few GB more the trainer holds at times (e.g. Adam state right after a resume); with too little,
+# SGLang's request pools leave no KV room and it refuses to start.
+sampler_mem_fraction: 0.9
+# Concurrent requests. SGLang sizes the linear-attention state pool for this number (~36 GB at 256), at the expense
+# of the KV cache; 128 keeps ~2.5x more KV tokens than 256, so more long RL samples decode at once instead of
+# queueing.
+sampler_max_running_requests: 128
+sampler_extra_args: ["--cuda-graph-max-bs-decode", "128", "--disable-radix-cache", "--watchdog-timeout", "3600",
+                     "--skip-server-warmup"]
+sampler_max_loaded_loras: 4
+sampler_port: 30100
+micro_batch_tokens: 2048
+future_ttl_sec: 600

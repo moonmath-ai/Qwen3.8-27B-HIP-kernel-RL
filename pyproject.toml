@@ -1,0 +1,32 @@
+[project]
+name = "zroform"
+version = "0.1.0"
+description = "Tinker-compatible LoRA training server (RL/SFT/DPO) on SGLang + PyTorch"
+# On the MI300X these come from the SGLang ROCm image plus scripts/setup_server_venv.sh (REPRODUCE.md §1);
+# this list documents the versions. A CUDA install (uv sync) is not what the result used.
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Wire contract: the server imports the pinned SDK's own types and protobuf module.
+    "tinker==0.33.1",
+    # Sampler. In the ROCm image: torch 2.11.0+rocm7.2, transformers 5.12.1.
+    "sglang==0.5.21",
+    "peft==0.21.2",
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "pyyaml",
+    "zstandard",
+    "safetensors",
+    "flash-linear-attention==0.5.2",
+]
+
+[dependency-groups]
+dev = ["pytest", "pytest-asyncio"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = ["gpu: needs a GPU and the real model"]
