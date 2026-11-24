@@ -16,7 +16,8 @@ paired bootstrap 95% CIs over tasks.
 | Held-out A, 200 tasks (used to pick step 75) | 14k | 0.289 | 0.515 | +22.6 [+18.1, +27.1] (107 up, 14 down) |
 | Held-out A at 20k | 20k | - | 0.536 | +2.1 [−1.5, +5.8] vs the adapter at 14k; +24.8 [+20.5, +29.0] vs base at 14k |
 
-- The gain is correctness, not speed: the median speedup of correct answers is about 0.95× PyTorch eager.
+- The gain is correctness, not speed: on tasks both models solve, step 75's kernels are as fast as base's (paired
+  1.05× [0.92, 1.23] on held-out A); newly solved tasks come in slow (median 0.65×), so the pooled median falls.
 - SFT alone did not help (0.254 vs base 0.274); the gain is from RL.
 - Learning plateaued at step 75; steps 75–125 are within noise of each other.
 - Regressions: within ±1.2 points on HumanEval+, MBPP+, IFEval, MATH-500; MMLU-Pro −3.3 [−6.7, 0.0] (§5).
@@ -101,6 +102,11 @@ largest gain is on fused ops (L2).
 **Where the reward came from** (steps 58–66): 80% correctness, 17% speed bonus, 4% compiles-but-wrong. 58% of
 correct answers were slower than eager and scored the same 1.0 as a 1.05× kernel (`REWARD.md` §3).
 
+**Speed on the same tasks** (step 75 vs base at 14k; per task, the median speedup of its correct answers; geometric
+mean of the ratio, bootstrap 95% CI over tasks): held-out A 1.05× [0.92, 1.23] on the 108 tasks both solve (step 75
+faster on 54), median 0.65× on the 40 tasks only step 75 solves; validation 1.11× [0.94, 1.31] on 64 (faster on 32),
+0.81× on 17. The pooled median falls (1.10 → 0.90 on held-out A) because of the new tasks, not slower kernels.
+
 **Regressions** (step 75 vs base, same server, 12,288 tokens, low reasoning; HumanEval+/MBPP+ 2 samples at
 temperature 1 through the safe grader, the others greedy; paired bootstrap over problems;
 `scripts/regress.sh`):
@@ -125,7 +131,8 @@ except MMLU-Pro (0.790 here vs 0.740 on NVIDIA; ~2 SE).
 2. **It plateaus at ~0.51–0.54 after ~75 steps** with this data, prompt and reward. Training batches flat at ~0.6
    correct from step ~75. More steps of the same will not help; change data, reward or context.
 3. **The reward teaches correctness, not speed.** With s < 1.1 counted as 1 and no penalty for slow kernels, the
-   policy drifts to correct-but-slow (median speedup 1.08 → ~0.95). To get speed, change the reward (`REWARD.md` §4:
+   policy solves new tasks with slow kernels (median 0.65×) and leaves speed on already-solved tasks unchanged
+   (paired 1.05×), so the pooled median falls (1.08 → ~0.95). To get speed, change the reward (`REWARD.md` §4:
    penalise s < 1, or a bigger bonus).
 4. **Budget is not the limit at 14k.** At 20k truncation falls from 16% to 3%, but correctness rises only +2 points
    (not significant): most answers that finish with more room are wrong.

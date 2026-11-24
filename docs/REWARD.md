@@ -63,7 +63,9 @@ Within a group:
 - turning a slow correct one into a 2× one gains +0.5.
 
 The policy follows this gradient. Held-out correctness rose from 27% (base) to 43% (step 50; 52% at step 75), while the median
-speedup of correct answers drifted from about 1.1× to below 1×.
+speedup of correct answers drifted from about 1.1× to below 1×. That drift comes from the newly solved tasks, which
+come in slow (median 0.65×); on tasks base already solved, step 75's kernels are as fast as base's (paired 1.05×
+[0.92, 1.23], `RESULTS.md`). Speed did not get worse; nothing in the reward made it better.
 
 Factors, from biggest to smallest effect:
 1. Correctness: the base 1.0.

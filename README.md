@@ -20,7 +20,9 @@ temperature 1; gain in points with a paired bootstrap 95% CI over tasks.
 | Validation: 100 tasks, never used for training or checkpoint choice (14,000 tokens) | 0.335 | **0.540** | +20.5 [14.3, 27.0] |
 | Held-out A: 200 tasks, used to pick the checkpoint (14,000 tokens) | 0.289 | **0.515** | +22.6 [18.1, 27.1] |
 
-- The gain is correctness, not speed: more than half of the adapter's correct answers are slower than PyTorch eager.
+- The gain is correctness, not speed: on tasks both models solve, the adapter's kernels are as fast as the base
+  model's; the newly solved tasks mostly come with slow kernels, so more than half of all correct answers are slower
+  than PyTorch eager.
 - All of it comes from RL; SFT before RL did not raise the held-out score. RL plateaued at step 75 (of 125).
 - Regressions vs base: HumanEval+, MBPP+, IFEval, MATH-500 within ±1.2 points; MMLU-Pro −3.3 [−6.7, 0.0].
 - One seed; all splits come from the same public datasets (in-distribution).

@@ -1,9 +1,12 @@
 """Paired comparison of two kernel evals on the same tasks (RESULTS.md): correct rate, paired bootstrap 95% CI
-over tasks (5,000 resamples, seed 0), tasks up / down, by level, and the other per-answer numbers of the model card.
+over tasks (5,000 resamples, seed 0), tasks up / down, by level, the other per-answer numbers of the model card, and
+speed on the tasks both models solve (so a change in the pooled median speedup can be split into same-task speed and
+the mix of newly solved tasks).
 Each argument is an eval directory with rollouts.jsonl + graded.jsonl (e.g. RUN/final/base_ha14k/evals/init).
   python3 -I scripts/compare.py BASE_DIR OTHER_DIR
 """
 import json
+import math
 import random
 import statistics
 import sys
@@ -53,8 +56,32 @@ def paired(a: dict, b: dict, n_boot: int = 5000, seed: int = 0) -> dict:
             "tasks_up": sum(x > 0 for x in d), "tasks_down": sum(x < 0 for x in d)}
 
 
+def paired_speed(a: dict, b: dict, n_boot: int = 5000, seed: int = 0) -> dict:
+    """Per task, the median speedup of its correct answers; geometric mean of other/base over tasks both solve."""
+    def per_task(rows):
+        t: dict = {}
+        for r in rows.values():
+            if r.get("correct") and r.get("speedup"):
+                t.setdefault(r["task"], []).append(r["speedup"])
+        return t
+    sa, sb = per_task(a), per_task(b)
+    both, only_b = sorted(set(sa) & set(sb)), sorted(set(sb) - set(sa))
+    if not both:
+        return {"tasks_both": 0}
+    lr = [math.log2(statistics.median(sb[k]) / statistics.median(sa[k])) for k in both]
+    rng = random.Random(seed)
+    boot = sorted(sum(rng.choice(lr) for _ in lr) / len(lr) for _ in range(n_boot))
+    new = [s for k in only_b for s in sb[k]]
+    return {"tasks_both": len(both), "tasks_only_other": len(only_b), "tasks_only_base": len(set(sa) - set(sb)),
+            "speed_ratio_both": round(2 ** (sum(lr) / len(lr)), 2),
+            "ci95": [round(2 ** boot[int(0.025 * n_boot) - 1], 2), round(2 ** boot[int(0.975 * n_boot) - 1], 2)],
+            "other_faster_on": sum(x > 0 for x in lr),
+            "median_speedup_only_other": round(statistics.median(new), 2) if new else None}
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         sys.exit(__doc__)
     a, b = load(sys.argv[1]), load(sys.argv[2])
-    print(json.dumps({"base": summary(a), "other": summary(b), "other_vs_base": paired(a, b)}, indent=1))
+    print(json.dumps({"base": summary(a), "other": summary(b), "other_vs_base": paired(a, b),
+                      "speed_on_tasks_both_solve": paired_speed(a, b)}, indent=1))

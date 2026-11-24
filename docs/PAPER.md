@@ -11,8 +11,10 @@ it against PyTorch on three random inputs, and times it; the reward pays for cor
 speedup over PyTorch eager (the Zro-form reward). On 100 validation tasks never used for training or checkpoint choice, the share of
 correct kernels rose from 0.335 to 0.540 (+20.5 points, paired 95% CI [14.3, 27.0]); on 200 held-out tasks, from
 0.289 to 0.515 (+22.6 [18.1, 27.1]). Nearly all of the gain is better solutions, not fewer answers running out of
-tokens. But the kernels did not get faster: the median speedup of correct answers fell from 1.10× to 0.90× PyTorch
-eager, because the reward pays the same for a slow correct kernel as for one 1.05× faster. General benchmarks
+tokens. But the kernels did not get faster. On tasks both models solve, the adapter's kernels are as fast as the
+base model's (paired speed ratio 1.05× [0.92, 1.23]); the median speedup over all correct answers falls from 1.10× to
+0.90× PyTorch eager because the newly solved tasks are solved with slow kernels (median 0.65×). The reward pays the
+same for a slow correct kernel as for one 1.05× faster, so nothing pushed speed up. General benchmarks
 (HumanEval+, MBPP+, IFEval, MATH-500) moved by at most 1.2 points; MMLU-Pro fell 3.3 points [−6.7, 0.0].
 
 ## 1. What is new here, and what isn't
@@ -23,8 +25,9 @@ is a standard group-relative policy gradient on a self-hosted Tinker-compatible 
 
 **What we think is useful to others:**
 
-1. **What a standard speedup reward actually teaches** (§7): almost all of the reward earned was for correctness,
-   and the policy drifted to correct-but-slow kernels. If speed matters, the reward has to say so.
+1. **What a standard speedup reward actually teaches** (§7): almost all of the reward earned was for correctness.
+   The policy learned to solve more tasks, the new ones mostly with slow kernels, and left speed on the tasks it
+   could already solve unchanged. A speed bonus is not enough if slow kernels cost nothing.
 2. **Containment for model-written GPU code** (§2): building in a no-GPU sandbox, running each answer in its own
    container, comparing outputs outside it, and a driver watchdog plus per-step checkpoints, because a bad kernel
    can reset the GPU or wedge the driver, and both happened during training.
@@ -162,6 +165,19 @@ wrong". Within a group, turning a wrong answer into a slow correct one gains +0.
 a 2× one gains +0.5. The policy follows that gradient: it solves more tasks, including more with a real speedup
 (116 → 169), but more than half of its correct kernels are slower than eager, and 58% of correct training answers
 were, scoring the same 1.0 as a 1.05× kernel.
+
+**Same tasks, same speed; new tasks, slow kernels.** The drop in the median is a mix effect, not slower kernels.
+For each task we take the median speedup of its correct answers and compare step 75 with base task by task:
+
+| | Held-out A | Validation |
+|---|---|---|
+| Tasks solved by both / only step 75 / only base | 108 / 40 / 4 | 64 / 17 / 1 |
+| Tasks solved by both: speed ratio step 75 / base (geometric mean, 95% CI) | 1.05× [0.92, 1.23] | 1.11× [0.94, 1.31] |
+| Tasks solved by both: step 75 faster on | 54 of 108 | 32 of 64 |
+| Median speedup on tasks only step 75 solves | 0.65× | 0.81× |
+
+The newly solved tasks come in slow, and step 75 also gets more answers right per shared task, which weights slow
+tasks more in the pooled median. RL did not make kernels slower; it did not make them faster either.
 
 To train for speed, the reward has to penalise slow kernels (for example `clip(log2 s, −1, 3)`, so 0.5× scores
 0.5) or pay more for speed, and runs should be compared on held-out correctness *and* speedup, not on reward. Both

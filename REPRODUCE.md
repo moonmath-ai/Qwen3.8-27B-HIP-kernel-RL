@@ -171,7 +171,8 @@ python3 -I scripts/compare.py $R/final/base_ha14k/evals/init $R/rl/evals/step007
 ```
 
 `compare.py` prints both models' numbers (correct, compiled, truncated, correct and ≥ 1.1×, median speedup, by
-level) and the paired gain with its bootstrap CI over tasks. Ours: validation +20.5 [14.3, 27.0], held-out A
+level), the paired gain with its bootstrap CI over tasks, and speed on the tasks both solve (geometric mean of the
+per-task speed ratio, with its CI). Ours: validation +20.5 [14.3, 27.0], held-out A
 +22.6 [18.1, 27.1] (the CI endpoints can move by 0.1 with the resampling order).
 
 Regressions (~35 min per model):
